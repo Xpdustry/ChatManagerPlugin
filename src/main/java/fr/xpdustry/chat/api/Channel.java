@@ -8,10 +8,14 @@ import java.util.*;
 public interface Channel{
     @NonNull ChannelAccess getAccess();
 
-    @NonNull Collection<String> getMembers();
+    @NonNull Collection<ChannelMember> getMembers();
 
-    default boolean hasMember(@NonNull String member){
+    default boolean hasMember(@NonNull ChannelMember member){
         return getMembers().contains(member);
+    }
+
+    default void broadCastMessage(@NonNull String message){
+        getMembers().forEach(m -> m.sendMessage(message));
     }
 
     enum ChannelAccess{

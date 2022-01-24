@@ -1,8 +1,10 @@
 package fr.xpdustry.chat;
 
+import mindustry.*;
 import mindustry.gen.*;
 
 import fr.xpdustry.chat.api.*;
+import fr.xpdustry.chat.internal.*;
 import fr.xpdustry.distributor.command.*;
 import fr.xpdustry.distributor.command.argument.PlayerArgument.*;
 import fr.xpdustry.distributor.command.sender.*;
@@ -14,8 +16,15 @@ import org.checkerframework.checker.nullness.qual.*;
 
 
 public class ChatManagerPlugin extends AbstractPlugin{
-    private static final ChannelManager<?> channelManager = new SimplePrivateMessageManager(((channel, uuid, message) -> channel + uuid + message));
-    // private static ChatManagerConfig config;
+    // private static @SuppressWarnings("NullAway.Init") ChatManagerConfig config;
+    private static final ChannelManager channelManager = new SimplePrivateMessageManager((channel, member, message) -> {
+        if(member instanceof LocalChannelMember m){
+            return "[lightgray]<W>[] " + Vars.netServer.chatFormatter.format(m.getPlayer(), message);
+        }else{
+            return message;
+        }
+    });
+
 
     /**
      * This method is called when game initializes.

@@ -1,12 +1,10 @@
 package fr.xpdustry.chat;
 
 import arc.struct.*;
-import arc.util.*;
 
 import mindustry.game.EventType.*;
 import mindustry.gen.*;
 
-import fr.xpdustry.chat.SimplePrivateMessageManager.*;
 import fr.xpdustry.chat.api.*;
 import fr.xpdustry.distributor.command.sender.*;
 import fr.xpdustry.distributor.event.*;
@@ -19,34 +17,23 @@ import org.checkerframework.checker.nullness.qual.*;
 import java.util.*;
 
 
-public class SimplePrivateMessageManager implements ChannelManager<PrivateMessageChannel>{
+public class SimplePrivateMessageManager implements ChannelManager{
     private final @NonNull ChannelFormatter formatter;
+
+    private final ObjectMap<Playerc, ChannelMember> members = new ObjectMap<>();
+    private final ObjectMap<Playerc, PrivateMessageChannel> replies = new ObjectMap<>();
     private final Seq<PrivateMessageChannel> channels = new Seq<>();
-    private final Map<String, PrivateMessageChannel> replies = new HashMap<>();
+
     private final EventWatcher<PlayerLeave> listener = new EventWatcher<>(PlayerLeave.class, e -> {
-        channels.select(c -> c.hasMember(e.player.uuid())).forEach(this::onChannelClose);
-        replies.remove(e.player.uuid());
+        final var member = members.remove(e.player);
+        if(member != null)
+            channels.select(c -> c.hasMember(member)).forEach(channels::remove);
+        replies.remove(e.player);
     });
 
     public SimplePrivateMessageManager(@NonNull ChannelFormatter formatter){
         this.formatter = formatter;
         listener.listen();
-    }
-
-    @Override public @NonNull Collection<PrivateMessageChannel> getChannels(){
-        return Collections.unmodifiableCollection(new ArcList<>(channels));
-    }
-
-    @Override public void onChannelOpen(@NonNull PrivateMessageChannel channel){
-        channels.add(channel);
-    }
-
-    @Override public void onChannelClose(@NonNull PrivateMessageChannel channel){
-        channels.remove(channel);
-    }
-
-    @Override public void close(){
-        listener.stop();
     }
 
     @CommandMethod("whisper|w <player> <message>")
@@ -57,13 +44,14 @@ public class SimplePrivateMessageManager implements ChannelManager<PrivateMessag
         final @NonNull @Argument("player") Player target,
         final @NonNull @Argument("message") @Greedy String message
     ){
-        if(sender.asPlayer().uuid().equals(target.uuid())){
+        if(sender.asPlayer() == target){
             sender.send("Error can't message yourself.");
         }else{
-            var channel = getChannel(sender.asPlayer().uuid(), target.uuid());
-            broadcast(channel, sender.asPlayer().name(), message);
-            replies.put(sender.asPlayer().uuid(), channel);
-            replies.put(target.uuid(), channel);
+            var channel = getChannel((Player)sender.asPlayer(), target);
+            channel.broadCastMessage(formatter.format(channel, members.get(sender.asPlayer()), message));
+
+            replies.put(sender.asPlayer(), channel);
+            replies.put(target, channel);
         }
     }
 
@@ -74,52 +62,61 @@ public class SimplePrivateMessageManager implements ChannelManager<PrivateMessag
         final @NonNull ArcCommandSender sender,
         final @NonNull @Argument("message") @Greedy String message
     ){
-        final var channel = replies.get(sender.asPlayer().uuid());
+        final var channel = replies.get(sender.asPlayer());
 
         if(channel == null){
             sender.send("Error, no recent channel.");
         }else{
-            broadcast(channel, sender.asPlayer().name(), message);
+            channel.broadCastMessage(formatter.format(channel, members.get(sender.asPlayer()), message));
         }
+    }
+
+    @Override public @NonNull Collection<Channel> getChannels(){
+        return Collections.unmodifiableCollection(new ArcList<>(channels.as()));
+    }
+
+    @Override public void close(){
+        listener.stop();
     }
 
     private @NonNull PrivateMessageChannel getChannel(
-        final @NonNull String senderUUID,
-        final @NonNull String targetUUID
+        final @NonNull ChannelMember sender,
+        final @NonNull ChannelMember target
     ){
         for(final var channel : channels){
-            if(channel.hasMember(senderUUID) && channel.hasMember(targetUUID)) return channel;
+            if(channel.hasMember(sender) && channel.hasMember(target)) return channel;
         }
 
-        Log.info(senderUUID, targetUUID);
-        final var channel = new PrivateMessageChannel(senderUUID, targetUUID);
-        onChannelOpen(channel);
+        final var channel = new PrivateMessageChannel(sender, target);
+        channels.add(channel);
         return channel;
     }
 
-    private void broadcast(
-        final @NonNull PrivateMessageChannel channel,
-        final @NonNull String name,
-        final @NonNull String message
+    private @NonNull PrivateMessageChannel getChannel(
+        final @NonNull Player sender,
+        final @NonNull Player target
     ){
-        Groups.player.each(
-            p -> channel.hasMember(p.uuid()),
-            p -> p.sendMessage(formatter.format(channel, name, message))
+        return getChannel(
+            members.get(sender, () -> new LocalChannelMember(sender)),
+            members.get(target, () -> new LocalChannelMember(target))
         );
     }
 
     public static class PrivateMessageChannel implements Channel{
-        private final Collection<String> members;
+        private final Collection<ChannelMember> members;
 
-        public PrivateMessageChannel(@NonNull String uuidA, @NonNull String uuidB){
-            members = Set.of(uuidA, uuidB);
+        public PrivateMessageChannel(
+            final @NonNull ChannelMember memberA,
+            final @NonNull ChannelMember memberB
+        ){
+            members = Set.of(memberA, memberB);
         }
 
         @Override public @NonNull ChannelAccess getAccess(){
             return ChannelAccess.PRIVATE;
         }
 
-        @Override public @NonNull Collection<String> getMembers(){
+        @NonNull @Override public Collection<ChannelMember> getMembers(){
             return members;
         }
     }
