@@ -1,13 +1,13 @@
 {
-  "name": "xpdustry-template-plugin",
-  "displayName": "Xpdustry TemplatePlugin",
+  "name": "xpdustry-chat-plugin",
+  "displayName": "Xpdustry ChatManagerPlugin",
   "author": "Xpdustry",
-  "description": "A template plugin for easier development, enjoy.",
+  "description": "A plugin for chat management.",
   "version": "0.1",
-  "minGameVersion": "105",
+  "minGameVersion": "127",
   "hidden": true,
   "java": true,
-  "main": "fr.xpdustry.template.TemplatePlugin",
-  "repo": "Xpdustry/TemplatePlugin",
-  "dependencies": []
+  "main": "fr.xpdustry.chat.ChatManagerPlugin",
+  "repo": "Xpdustry/ChatManagerPlugin",
+  "dependencies": ["xpdustry-distributor-core"]
 }
