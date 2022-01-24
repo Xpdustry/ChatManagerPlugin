@@ -4,7 +4,6 @@ import mindustry.*;
 import mindustry.gen.*;
 
 import fr.xpdustry.chat.api.*;
-import fr.xpdustry.chat.internal.*;
 import fr.xpdustry.distributor.command.*;
 import fr.xpdustry.distributor.command.argument.PlayerArgument.*;
 import fr.xpdustry.distributor.command.sender.*;

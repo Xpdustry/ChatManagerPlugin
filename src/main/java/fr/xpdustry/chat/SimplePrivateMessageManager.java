@@ -21,14 +21,12 @@ public class SimplePrivateMessageManager implements ChannelManager{
     private final @NonNull ChannelFormatter formatter;
 
     private final ObjectMap<Playerc, ChannelMember> members = new ObjectMap<>();
-    private final ObjectMap<Playerc, PrivateMessageChannel> replies = new ObjectMap<>();
-    private final Seq<PrivateMessageChannel> channels = new Seq<>();
+    private final ObjectMap<Playerc, Channel> replies = new ObjectMap<>();
+    private final Seq<Channel> channels = new Seq<>();
 
     private final EventWatcher<PlayerLeave> listener = new EventWatcher<>(PlayerLeave.class, e -> {
         final var member = members.remove(e.player);
-        if(member != null)
-            channels.select(c -> c.hasMember(member)).forEach(channels::remove);
-        replies.remove(e.player);
+        if(member != null) getChannels(member).forEach(this::onChannelClose);
     });
 
     public SimplePrivateMessageManager(@NonNull ChannelFormatter formatter){
@@ -79,7 +77,18 @@ public class SimplePrivateMessageManager implements ChannelManager{
         listener.stop();
     }
 
-    private @NonNull PrivateMessageChannel getChannel(
+    private Collection<Channel> getChannels(@NonNull ChannelMember member){
+        return getChannels().stream().filter(c -> c.hasMember(member)).toList();
+    }
+
+    private void onChannelClose(@NonNull Channel channel){
+        channels.remove(channel);
+        channel.getMembers().forEach(m -> {
+            if(m instanceof LocalChannelMember l) replies.remove(l.getPlayer());
+        });
+    }
+
+    private @NonNull Channel getChannel(
         final @NonNull ChannelMember sender,
         final @NonNull ChannelMember target
     ){
@@ -92,7 +101,7 @@ public class SimplePrivateMessageManager implements ChannelManager{
         return channel;
     }
 
-    private @NonNull PrivateMessageChannel getChannel(
+    private @NonNull Channel getChannel(
         final @NonNull Player sender,
         final @NonNull Player target
     ){
