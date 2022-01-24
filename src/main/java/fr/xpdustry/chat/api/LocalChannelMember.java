@@ -1,4 +1,4 @@
-package fr.xpdustry.chat;
+package fr.xpdustry.chat.api;
 
 import mindustry.gen.*;
 

@@ -18,7 +18,7 @@ buildscript{
                 "mindustry": property("props.mindustry-version"),
                 "arc": property("props.arc-version"),
                 "junit": "5.8.2",
-                "distributor": "2.1.0"
+                "distributor": "2.1.0-SNAPSHOT"
         ]
     }
 }
@@ -40,7 +40,7 @@ version metadata.version + (indraGit.headTag() == null ? "-SNAPSHOT" : "")
 repositories{
     mavenCentral()
     maven{ url "https://www.jitpack.io" }
-    maven{ url "https://repo.xpdustry.fr/releases" }
+    maven{ url "https://repo.xpdustry.fr/snapshots" }
 }
 
 dependencies{

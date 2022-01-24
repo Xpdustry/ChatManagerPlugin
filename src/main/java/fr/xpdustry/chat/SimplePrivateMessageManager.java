@@ -20,8 +20,8 @@ import java.util.*;
 public class SimplePrivateMessageManager implements ChannelManager{
     private final @NonNull ChannelFormatter formatter;
 
-    private final ObjectMap<Playerc, ChannelMember> members = new ObjectMap<>();
-    private final ObjectMap<Playerc, Channel> replies = new ObjectMap<>();
+    private final Map<Player, LocalChannelMember> members = new HashMap<>();
+    private final Map<ChannelMember, Channel> replies = new HashMap<>();
     private final Seq<Channel> channels = new Seq<>();
 
     private final EventWatcher<PlayerLeave> listener = new EventWatcher<>(PlayerLeave.class, e -> {
@@ -35,7 +35,7 @@ public class SimplePrivateMessageManager implements ChannelManager{
     }
 
     @CommandMethod("whisper|w <player> <message>")
-    // @CommandPermission("chat-manager:chat")
+    @CommandPermission("chat-manager:chat")
     @CommandDescription("Whisper a message to another player.")
     public void sendMessage(
         final @NonNull ArcCommandSender sender,
@@ -45,27 +45,25 @@ public class SimplePrivateMessageManager implements ChannelManager{
         if(sender.asPlayer() == target){
             sender.send("Error can't message yourself.");
         }else{
-            var channel = getChannel((Player)sender.asPlayer(), target);
-            channel.broadCastMessage(formatter.format(channel, members.get(sender.asPlayer()), message));
-
-            replies.put(sender.asPlayer(), channel);
-            replies.put(target, channel);
+            var channel = getChannel(sender.asPlayer(), target);
+            onChannelMessage(channel, members.get(sender.asPlayer()), message);
         }
     }
 
     @CommandMethod("reply|r <message>")
-    // @CommandPermission("chat-manager:chat")
+    @CommandPermission("chat-manager:chat")
     @CommandDescription("Whisper a message to another player.")
     public void sendMessage(
         final @NonNull ArcCommandSender sender,
         final @NonNull @Argument("message") @Greedy String message
     ){
-        final var channel = replies.get(sender.asPlayer());
+        final var member = members.get(sender.asPlayer());
+        final var channel = member == null ? null : replies.get(member);
 
         if(channel == null){
             sender.send("Error, no recent channel.");
         }else{
-            channel.broadCastMessage(formatter.format(channel, members.get(sender.asPlayer()), message));
+            onChannelMessage(channel, member, message);
         }
     }
 
@@ -81,34 +79,39 @@ public class SimplePrivateMessageManager implements ChannelManager{
         return getChannels().stream().filter(c -> c.hasMember(member)).toList();
     }
 
-    private void onChannelClose(@NonNull Channel channel){
-        channels.remove(channel);
-        channel.getMembers().forEach(m -> {
-            if(m instanceof LocalChannelMember l) replies.remove(l.getPlayer());
-        });
-    }
-
-    private @NonNull Channel getChannel(
-        final @NonNull ChannelMember sender,
-        final @NonNull ChannelMember target
-    ){
+    private @NonNull Channel getChannel(final @NonNull ChannelMember sender, final @NonNull ChannelMember target){
         for(final var channel : channels){
             if(channel.hasMember(sender) && channel.hasMember(target)) return channel;
         }
 
         final var channel = new PrivateMessageChannel(sender, target);
-        channels.add(channel);
+        onChannelOpen(channel);
         return channel;
     }
 
-    private @NonNull Channel getChannel(
-        final @NonNull Player sender,
-        final @NonNull Player target
-    ){
+    private @NonNull Channel getChannel(final @NonNull Player sender, final @NonNull Player target){
         return getChannel(
-            members.get(sender, () -> new LocalChannelMember(sender)),
-            members.get(target, () -> new LocalChannelMember(target))
+            members.computeIfAbsent(sender, LocalChannelMember::new),
+            members.computeIfAbsent(target, LocalChannelMember::new)
         );
+    }
+
+    private void onChannelOpen(@NonNull Channel channel){
+        channels.add(channel);
+    }
+
+    private void onChannelClose(@NonNull Channel channel){
+        channels.remove(channel);
+        channel.getMembers().forEach(replies::remove);
+    }
+
+    private void onChannelMessage(
+        final @NonNull Channel channel,
+        final @NonNull ChannelMember member,
+        final @NonNull String message
+    ){
+        channel.broadCastMessage(formatter.format(channel, member, message));
+        channel.getMembers().forEach(m -> replies.put(m, channel));
     }
 
     public static class PrivateMessageChannel implements Channel{
